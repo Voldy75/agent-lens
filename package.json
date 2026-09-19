@@ -1,6 +1,6 @@
 {
   "name": "agent-lens-report",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "See where an agent-built project actually stands. Reads git, plan files, and local coding-agent session logs, and writes one self-contained HTML report.",
   "bin": {
     "agent-lens": "bin/agent-lens.js",
