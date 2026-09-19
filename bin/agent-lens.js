@@ -50,6 +50,10 @@ Everything runs locally. No code, prompt, or path is uploaded.`;
 
 const dir = (p) => { fs.mkdirSync(p, { recursive: true }); return p; };
 
+function loadAuthored(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+}
+
 function loadPrevious(stateFile) {
   try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return null; }
 }
@@ -75,17 +79,29 @@ async function cmdScan(a) {
   const root = path.resolve(a.cwd);
   if (!fs.existsSync(root)) { console.error(`No such folder: ${root}`); process.exit(1); }
 
-  const outDir = dir(path.join(root, '.agent-lens'));
+  // --json only prints; it must not leave a folder behind in the project.
+  const outDir = a.json ? path.join(root, '.agent-lens') : dir(path.join(root, '.agent-lens'));
   const stateFile = path.join(outDir, 'state.json');
+  const authoredFile = path.join(outDir, 'authored.json');
   const reportFile = path.resolve(a.out || path.join(outDir, 'report.html'));
 
   const previous = loadPrevious(stateFile);
   const t0 = Date.now();
   const { state, warnings } = await buildState(root, { previous, planFile: a.planFile });
 
-  // Keep whatever an agent authored last time unless the shape changed.
-  if (previous && previous.meta && previous.meta.authored) {
-    applyAuthoring(state, previous, { quiet: true });
+  // Re-apply what the agent authored. Only the agent's own file is replayed:
+  // replaying the whole previous state froze the headline and relabelled a
+  // real plan as "reconstructed by your agent".
+  const authored = loadAuthored(authoredFile);
+  if (authored) {
+    applyAuthoring(state, authored, { quiet: true, keepMeasuredPlan: true });
+    state.meta.authored = true;
+    state.meta.needsAuthoring = false;
+  } else if (previous && previous.meta && previous.meta.authored) {
+    // Reports authored before 0.2.4 have no saved file; keep names only.
+    applyAuthoring(state, { districts: previous.districts, modules: previous.modules, flows: previous.flows }, { quiet: true });
+    state.meta.authored = true;
+    state.meta.needsAuthoring = false;
   }
 
   if (a.json) { process.stdout.write(JSON.stringify(state, null, 2) + '\n'); return; }
@@ -108,7 +124,7 @@ async function cmdScan(a) {
   console.log(`\n  report  ${reportFile}  (${Math.round(bytes / 1024)} KB)`);
   console.log(`  state   ${stateFile}`);
   if (state.meta.needsAuthoring && !a.noOpen) {
-    console.log(`\n  Folder names are placeholders. For plain-English descriptions, run this\n  inside your coding agent:  agent-lens author --prompt`);
+    console.log(`\n  Folder names are placeholders. For plain-English descriptions, run this\n  inside your coding agent:  npx agent-lens-report author --prompt`);
   }
   console.log('');
 }
@@ -116,7 +132,7 @@ async function cmdScan(a) {
 function cmdRender(a) {
   const root = path.resolve(a.cwd);
   const stateFile = path.join(root, '.agent-lens', 'state.json');
-  if (!fs.existsSync(stateFile)) { console.error('No state.json yet — run `agent-lens scan` first.'); process.exit(1); }
+  if (!fs.existsSync(stateFile)) { console.error('No state.json yet — run `npx agent-lens-report` first.'); process.exit(1); }
   const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
   const reportFile = path.resolve(a.out || path.join(root, '.agent-lens', 'report.html'));
   const { bytes } = renderToFile(state, reportFile, { version: VERSION, warnings: [] });
@@ -126,12 +142,14 @@ function cmdRender(a) {
 function cmdAuthor(a) {
   const root = path.resolve(a.cwd);
   const stateFile = path.join(root, '.agent-lens', 'state.json');
-  if (!fs.existsSync(stateFile)) { console.error('No state.json yet — run `agent-lens scan` first.'); process.exit(1); }
+  if (!fs.existsSync(stateFile)) { console.error('No state.json yet — run `npx agent-lens-report` first.'); process.exit(1); }
   const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
 
   if (a.apply) {
     const authored = JSON.parse(fs.readFileSync(path.resolve(a.apply), 'utf8'));
     const report = applyAuthoring(state, authored);
+    // Kept so every later scan can re-apply it on top of fresh measurements.
+    fs.writeFileSync(path.join(root, '.agent-lens', 'authored.json'), JSON.stringify(authored, null, 2) + '\n');
     state.meta.authored = true;
     state.meta.needsAuthoring = false;
     fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\n');
@@ -148,6 +166,9 @@ function cmdAuthor(a) {
 function cmdLs() {
   let idx = {};
   try { idx = JSON.parse(fs.readFileSync(INDEX, 'utf8')); } catch { console.log('Nothing scanned yet.'); return; }
+  // Forget folders that have been deleted or moved since they were scanned.
+  const gone = Object.keys(idx).filter((p) => !fs.existsSync(p));
+  if (gone.length) { gone.forEach((p) => delete idx[p]); try { fs.writeFileSync(INDEX, JSON.stringify(idx, null, 2) + '\n'); } catch { /* read-only home */ } }
   const rows = Object.entries(idx).sort((a, b) => (a[1].scannedAt < b[1].scannedAt ? 1 : -1));
   if (!rows.length) { console.log('Nothing scanned yet.'); return; }
   console.log('');

@@ -275,6 +275,7 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
   const todo = plan.length - done - prog;
 
   let html = `<h1 class="thesis">${mark(s.headline || "No summary was written for this scan.")}</h1>`;
+  if (s.about) html += `<p class="subthesis">${esc(s.about)} <span style="opacity:.6">(written by your agent)</span></p>`;
   if (s.subhead) html += `<p class="subthesis">${esc(s.subhead)}</p>`;
 
   if (plan.length) {
@@ -304,7 +305,7 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
   }
   if (cards.length) html += `<div class="grid2">${cards.join("")}</div>`;
   if (BUILD.warnings && BUILD.warnings.length) {
-    html += `<div class="warnbox" style="margin-top:26px"><b>This scan was incomplete.</b>
+    html += `<div class="warnbox" style="margin-top:26px"><b>Worth knowing about this report</b>
       <ul>${BUILD.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
   }
   $("p-now").innerHTML = html;
@@ -496,10 +497,23 @@ if (STATE.has.map) {
   };
   window.__fit = fit; fit();
 
-  let dragging = false, lx = 0, ly = 0;
-  svg.addEventListener("pointerdown", e => { dragging = true; lx = e.clientX; ly = e.clientY; svg.classList.add("drag"); svg.setPointerCapture(e.pointerId); });
-  svg.addEventListener("pointermove", e => { if (!dragging) return; view.x += e.clientX - lx; view.y += e.clientY - ly; lx = e.clientX; ly = e.clientY; apply(); });
-  svg.addEventListener("pointerup", () => { dragging = false; svg.classList.remove("drag"); });
+  // Capture the pointer only once it has moved: capturing on pointerdown
+  // retargets the click to the <svg>, so clicking a building did nothing.
+  let down = false, dragging = false, sx = 0, sy = 0, lx = 0, ly = 0;
+  svg.addEventListener("pointerdown", e => { down = true; dragging = false; sx = lx = e.clientX; sy = ly = e.clientY; });
+  svg.addEventListener("pointermove", e => {
+    if (!down) return;
+    if (!dragging) {
+      if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 4) return;
+      dragging = true; svg.classList.add("drag"); svg.setPointerCapture(e.pointerId);
+    }
+    view.x += e.clientX - lx; view.y += e.clientY - ly; lx = e.clientX; ly = e.clientY; apply();
+  });
+  const endDrag = () => { down = false; svg.classList.remove("drag"); setTimeout(() => { dragging = false; }, 0); };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+  // A drag that ends over a building must not also select it.
+  svg.addEventListener("click", e => { if (dragging) e.stopPropagation(); }, true);
   svg.addEventListener("wheel", e => { e.preventDefault(); view.k = Math.max(.4, Math.min(2.8, view.k * (e.deltaY < 0 ? 1.1 : .9))); apply(); }, { passive: false });
   $("reset").addEventListener("click", () => { clearAll(); fit(); });
 

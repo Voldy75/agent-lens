@@ -49,7 +49,7 @@ rather than pretending the scan was complete.
 
 | Agent | Plan status | Cost | Notes |
 |---|---|---|---|
-| **Antigravity** | best — `task.md` checkboxes carry real state | no | model runs server-side, no local token ledger |
+| **Antigravity** | best — `task.md` checkboxes carry real state | no | reads `~/.gemini/antigravity/brain/*/task.md` from conversations that link into this folder; no local token ledger |
 | **Claude Code** | `CLAUDE.md`, freeform | yes | reads `~/.claude/projects/*.jsonl` |
 | **Codex** | `AGENTS.md`, freeform | yes | reads `~/.codex/sessions/**/rollout-*.jsonl`, filtered by `session_meta.cwd` |
 | **Cursor / other** | any `PLAN.md`, `TODO.md` | no | git tier always works |
@@ -77,13 +77,13 @@ names need a model — so agent-lens uses the one already sitting next to you.
 Inside Claude Code, Codex, Cursor, or Antigravity:
 
 ```
-agent-lens author --prompt
+npx agent-lens-report author --prompt
 ```
 
 Paste the output to your agent. It writes `agent-lens.authored.json`, then:
 
 ```
-agent-lens author --apply agent-lens.authored.json
+npx agent-lens-report author --apply agent-lens.authored.json
 ```
 
 No API key, no code leaving the machine, no cost to you. **The agent can only
@@ -100,7 +100,9 @@ There is no fixed filename. Every markdown file in the repo root, `docs/`,
 actually in it — checkbox density, plan-shaped headings, action bullets, how
 often git touches it — with penalties for things that merely look like plans.
 Changelogs are the classic false positive and are scored down hard, including
-ones not named CHANGELOG.
+ones not named CHANGELOG. Setup, install and deploy guides are scored down too:
+they are checklists for configuring something, not a plan for what is being
+built. READMEs are never used as the plan.
 
 The report always names the file it chose, why, and what else it considered,
 so a wrong pick is visible rather than silent.
