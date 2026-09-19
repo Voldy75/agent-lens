@@ -20,8 +20,10 @@
   "dependencies": {},
   "scripts": {
     "selftest": "node test/selftest.js",
+    "test": "node test/selftest.js",
     "prepublishOnly": "node test/selftest.js",
-    "rename": "node scripts/rename.js"
+    "rename": "node scripts/rename.js",
+    "set-repo": "node scripts/set-repo.js"
   },
   "keywords": [
     "claude-code",
