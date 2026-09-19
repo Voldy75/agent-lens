@@ -46,11 +46,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Voldy75/agent-lens.git"
+    "url": "git+https://github.com/Voldy75/agent-lens-report.git"
   },
-  "homepage": "https://github.com/Voldy75/agent-lens#readme",
+  "homepage": "https://github.com/Voldy75/agent-lens-report#readme",
   "bugs": {
-    "url": "https://github.com/Voldy75/agent-lens/issues"
+    "url": "https://github.com/Voldy75/agent-lens-report/issues"
   },
   "publishConfig": {
     "access": "public"
