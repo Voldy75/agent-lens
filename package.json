@@ -1,9 +1,10 @@
 {
-  "name": "agent-lens",
-  "version": "0.2.0",
+  "name": "agent-lens-report",
+  "version": "0.2.1",
   "description": "See where an agent-built project actually stands. Reads git, plan files, and local coding-agent session logs, and writes one self-contained HTML report.",
   "bin": {
     "agent-lens": "bin/agent-lens.js",
+    "agent-lens-report": "bin/agent-lens.js",
     "agent-lens-selftest": "test/selftest.js"
   },
   "main": "lib/render.js",
@@ -36,7 +37,7 @@
     "project-status",
     "vibe-coding"
   ],
-  "author": "",
+  "author": "Voldy75",
   "license": "MIT",
   "os": [
     "darwin",
@@ -45,11 +46,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/USERNAME/agent-lens.git"
+    "url": "git+https://github.com/Voldy75/agent-lens.git"
   },
-  "homepage": "https://github.com/USERNAME/agent-lens#readme",
+  "homepage": "https://github.com/Voldy75/agent-lens#readme",
   "bugs": {
-    "url": "https://github.com/USERNAME/agent-lens/issues"
+    "url": "https://github.com/Voldy75/agent-lens/issues"
   },
   "publishConfig": {
     "access": "public"

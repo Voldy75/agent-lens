@@ -32,7 +32,7 @@ likely to fail, since no part of this has ever run there.
 ## 2. Publish to npm
 
 ```bash
-npm view agent-lens version    # a 404 means the name is still free
+npm view agent-lens-report version    # a 404 means the name is still free
 npm login
 npm publish
 ```
@@ -49,7 +49,7 @@ npm publish --access public
 ## 3. Check it from the outside
 
 ```bash
-cd /tmp && npx agent-lens@latest --version
+cd /tmp && npx agent-lens-report@latest --version
 ```
 
 Install it somewhere you have not been developing. This catches the classic

@@ -32,12 +32,12 @@ function parse(argv) {
 
 const HELP = `agent-lens ${VERSION} — see where an agent-built project actually stands
 
-  npx agent-lens                 scan this folder and write a report
-  npx agent-lens scan            same thing, explicitly
-  npx agent-lens author --prompt print the authoring prompt for your agent
-  npx agent-lens author --apply f.json   merge an agent's authored fields
-  npx agent-lens render          re-render from the existing state file
-  npx agent-lens ls              every project you've scanned
+  npx agent-lens-report                 scan this folder and write a report
+  npx agent-lens-report scan            same thing, explicitly
+  npx agent-lens-report author --prompt print the authoring prompt for your agent
+  npx agent-lens-report author --apply f.json   merge an agent's authored fields
+  npx agent-lens-report render          re-render from the existing state file
+  npx agent-lens-report ls              every project you've scanned
 
 Options
   -C, --cwd <dir>    project folder (default: here)

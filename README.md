@@ -1,4 +1,4 @@
-# agent-lens
+# agent-lens-report
 
 See where an agent-built project actually stands — without reading the code.
 
@@ -7,18 +7,18 @@ your coding agent's local session logs, and writes one self-contained HTML
 report: what's done, what's in progress, what's blocked, what the agent kept
 rewriting, what it cost, and a map of the codebase you can click through.
 
-```bash
-npm install -g agent-lens-0.2.0.tgz   # from the tarball
-agent-lens                            # in any project folder
-```
-
-Once published to npm, no install is needed at all:
+Run it in any project folder — no install needed:
 
 ```bash
-npx agent-lens
+npx agent-lens-report
 ```
 
-See `PUBLISHING.md` for how to publish it.
+Or install it once and use the short `agent-lens` command:
+
+```bash
+npm install -g agent-lens-report
+agent-lens
+```
 
 Verify the install with `agent-lens-selftest` — it builds a throwaway repo,
 scans it, and checks 24 things end to end.
@@ -62,11 +62,11 @@ whole picture exists.
 ## Commands
 
 ```bash
-npx agent-lens                  # scan this folder, write the report
-npx agent-lens -C ../other-app  # scan somewhere else
-npx agent-lens ls               # every project you've scanned, with % done
-npx agent-lens render           # re-render without rescanning
-npx agent-lens author --prompt  # get better names and descriptions
+npx agent-lens-report                  # scan this folder, write the report
+npx agent-lens-report -C ../other-app  # scan somewhere else
+npx agent-lens-report ls               # every project you've scanned, with % done
+npx agent-lens-report render           # re-render without rescanning
+npx agent-lens-report author --prompt  # get better names and descriptions
 ```
 
 ## Making it readable: the authoring pass
