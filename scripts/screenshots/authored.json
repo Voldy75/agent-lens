@@ -1,0 +1,19 @@
+{
+  "districts": [{ "id": "src", "name": "The app" }],
+  "modules": [
+    { "id": "src-recipes", "name": "Recipes", "description": "Search recipes and see the details, including which ingredients you already have." },
+    { "id": "src-pantry", "name": "Pantry", "description": "Keeps track of what is in your kitchen. Scan a barcode to add something." },
+    { "id": "src-planner", "name": "Meal planner", "description": "Plan the week's meals by dragging recipes onto days." },
+    { "id": "src-auth", "name": "Sign-in", "description": "Email sign-in and keeping you signed in." },
+    { "id": "src-db", "name": "Saved data", "description": "Where recipes, pantry items and plans are stored." },
+    { "id": "src-shopping", "name": "Shopping list", "description": "Builds a shopping list from the week's plan, minus what is already in the pantry." },
+    { "id": "src-checkout", "name": "Checkout", "description": "Pay for the shopping list and book a delivery. Being built now." }
+  ],
+  "flows": [
+    { "id": "plan-week", "name": "Plan a week", "status": "built", "description": "Pick recipes for the week using what you already have.",
+      "path": [{ "module": "src-planner", "note": "choose days" }, { "module": "src-recipes", "note": "find recipes" }, { "module": "src-pantry", "note": "check what is in stock" }] },
+    { "id": "buy-groceries", "name": "Buy the groceries", "status": "active", "description": "Turn the plan into an order. Payment is not finished yet.",
+      "path": [{ "module": "src-checkout", "note": "pay" }, { "module": "src-shopping", "note": "the list" }, { "module": "src-planner", "note": "from this week's plan" }] }
+  ],
+  "summary": { "headline": "Pantry Pal plans your meals from what is already in your kitchen.", "subhead": "Planning works end to end; checkout is being built and payments wait on the provider." }
+}

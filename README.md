@@ -7,6 +7,10 @@ your coding agent's local session logs, and writes one self-contained HTML
 report: what's done, what's in progress, what's blocked, what the agent kept
 rewriting, what it cost, and a map of the codebase you can click through.
 
+![The Now tab: 5 of 10 steps done, one blocked step, and what changed recently](https://raw.githubusercontent.com/Voldy75/agent-lens-report/master/docs/screenshots/report-now.png)
+
+<sub>Sample report for a made-up recipe app, "Pantry Pal". Your report shows your own project.</sub>
+
 Run it in any project folder — no install needed:
 
 ```bash
@@ -44,6 +48,12 @@ and nothing is uploaded.
 
 Tabs you have no data for don't appear, and the report says so on the Now tab
 rather than pretending the scan was complete.
+
+| Plan | Map |
+|---|---|
+| ![Plan tab: every step from the plan file with its status](https://raw.githubusercontent.com/Voldy75/agent-lens-report/master/docs/screenshots/report-plan.png) | ![Map tab: the codebase as buildings, with a user journey highlighted](https://raw.githubusercontent.com/Voldy75/agent-lens-report/master/docs/screenshots/report-map.png) |
+| **Health** | **Cost** |
+| ![Health tab: files the agent kept rewriting and modules with no tests](https://raw.githubusercontent.com/Voldy75/agent-lens-report/master/docs/screenshots/report-health.png) | ![Cost tab: sessions, tokens per week and where the work went](https://raw.githubusercontent.com/Voldy75/agent-lens-report/master/docs/screenshots/report-cost.png) |
 
 ## Works with
 

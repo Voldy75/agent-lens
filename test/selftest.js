@@ -201,7 +201,7 @@ function fixes() {
   const real = fs.realpathSync(proj);
   const slug = real.replace(/[^a-zA-Z0-9]/g, '-');
   const usage = { input_tokens: 1e5, cache_read_input_tokens: 1e7, cache_creation_input_tokens: 0, output_tokens: 1e6 };
-  const reply = (id) => JSON.stringify({ type: 'assistant', timestamp: '2026-09-01T10:00:00Z', requestId: 'r' + id, message: { id: 'msg_' + id, usage, content: [] } });
+  const reply = (id) => JSON.stringify({ type: 'assistant', timestamp: '2026-09-01T10:00:00Z', requestId: 'r' + id, message: { id: 'msg_' + id, usage, content: [{ type: 'tool_use', input: { file_path: path.join(real, 'src/app/main.ts') } }] } });
   // One API response is logged as several lines; a second response once.
   write(path.join(HOME, '.claude', 'projects', slug, 's1.jsonl'), [reply(1), reply(1), reply(1), reply(2)].join('\n') + '\n');
 
@@ -282,6 +282,17 @@ function fixes() {
   ok('rescans pick up plan changes after authoring', later.plan.length === 4 && later.plan.filter((p) => p.status === 'done').length === 3, later.summary.headline);
   ok('real plan is not relabelled as reconstructed', later.plan.every((p) => !/reconstructed/.test((p.evidence || []).join())));
   ok('authored names survive two rescans', later.modules.some((m) => m.name === 'Android build'));
+
+  // The cost breakdown follows authored names, and one-off files are not "rewrites".
+  const shopMod = st.modules.find((m) => (st.cost.byArea || []).some((r) => r.id === m.id));
+  if (shopMod) {
+    const af2 = path.join(proj, 'authored.json');
+    write(af2, JSON.stringify({ modules: [{ id: shopMod.id, name: 'Storefront', description: 'x' }] }));
+    run(['author', '--apply', af2], proj);
+  }
+  ok('cost breakdown uses authored names', !!shopMod && stateOf(proj).cost.byArea.some((r) => r.label === 'Storefront'), JSON.stringify(stateOf(proj).cost.byArea));
+  ok('files changed once are not listed as rewrites', stateOf(proj).health.rows.every((r) => r.rewrites >= 2), JSON.stringify(stateOf(proj).health.rows.map((r) => r.rewrites)));
+  ok('"1 test file", not "1 test files"', !/\b1 test files\b/.test(JSON.stringify(stateOf(proj).health)));
 
   // --- the index and the commands -----------------------------------------
   const idx = JSON.parse(fs.readFileSync(path.join(HOME, '.agent-lens', 'projects.json'), 'utf8'));
