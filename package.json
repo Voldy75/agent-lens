@@ -1,0 +1,55 @@
+{
+  "name": "agent-lens",
+  "version": "0.2.0",
+  "description": "See where an agent-built project actually stands. Reads git, plan files, and local coding-agent session logs, and writes one self-contained HTML report.",
+  "bin": {
+    "agent-lens": "bin/agent-lens.js",
+    "agent-lens-selftest": "test/selftest.js"
+  },
+  "main": "lib/render.js",
+  "files": [
+    "bin/",
+    "lib/",
+    "test/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "scripts": {
+    "selftest": "node test/selftest.js",
+    "prepublishOnly": "node test/selftest.js",
+    "rename": "node scripts/rename.js"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "antigravity",
+    "cursor",
+    "agentic",
+    "ai-coding",
+    "codebase-visualization",
+    "project-status",
+    "vibe-coding"
+  ],
+  "author": "",
+  "license": "MIT",
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/USERNAME/agent-lens.git"
+  },
+  "homepage": "https://github.com/USERNAME/agent-lens#readme",
+  "bugs": {
+    "url": "https://github.com/USERNAME/agent-lens/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
