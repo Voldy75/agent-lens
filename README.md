@@ -7,9 +7,9 @@ your coding agent's local session logs, and writes one self-contained HTML
 report: what's done, what's in progress, what's blocked, what the agent kept
 rewriting, what it cost, and a map of the codebase you can click through.
 
-![The Now tab: 5 of 10 steps done, one blocked step, and what changed recently](https://raw.githubusercontent.com/Voldy75/agent-lens-report/master/docs/screenshots/report-now.png)
+![The Now tab: 5 of 10 steps done, one blocked step, and a warning that the agent keeps reworking the meal planner](https://raw.githubusercontent.com/Voldy75/agent-lens-report/master/docs/screenshots/report-now.png)
 
-<sub>Sample report for a made-up recipe app, "Pantry Pal". Your report shows your own project.</sub>
+<sub>Sample report for a made-up recipe app, "Pantry Pal". Your report shows your own project. **[Try the live demo →](https://voldy75.github.io/agent-lens-report/demo/)** (every tab works)</sub>
 
 Run it in any project folder — no install needed:
 
@@ -40,7 +40,7 @@ and nothing is uploaded.
 
 | Tab | Answers |
 |---|---|
-| **Now** | Where am I, what changed, what's stuck |
+| **Now** | Where am I, what changed, what's stuck, and whether your agent is going in circles |
 | **Plan** | Each step's status, linked to the modules it touched |
 | **Health** | What got rewritten most, what has no tests |
 | **Map** | Isometric map of the codebase, real imports between modules |
@@ -48,6 +48,23 @@ and nothing is uploaded.
 
 Tabs you have no data for don't appear, and the report says so on the Now tab
 rather than pretending the scan was complete.
+
+### Is your agent going in circles?
+
+The Now tab warns you, in plain words, when:
+
+- **the same file keeps being reworked** — changed in 5+ commits, or edited by
+  your agent in 4+ separate sessions, over the last two weeks
+- **the same error keeps coming back** — a failing command (a build, a type
+  check, a test run) with the same error 3+ times across 2+ agent sessions
+- **work continues but the plan has not moved** — nothing in the plan checklist
+  changed for a week, while commits and agent sessions carried on
+
+Each warning comes with something to ask your agent, such as *"Before changing
+week.tsx again, explain what keeps breaking and what a lasting fix would be."*
+Your agent's own tooling hiccups (a declined tool call, a browser timeout) are
+not counted as errors, and the thresholds are cautious on purpose: a warning
+that cries wolf teaches you to ignore it.
 
 | Plan | Map |
 |---|---|
@@ -69,6 +86,25 @@ Mixing agents in one repo is fine — adapters merge into the same state file.
 If you plan in Antigravity and execute in Codex, this is the only place the
 whole picture exists.
 
+## Inside Claude Code
+
+Install the plugin once, then just ask your agent:
+
+```
+/plugin marketplace add Voldy75/agent-lens-report
+/plugin install agent-lens@agent-lens
+```
+
+- **"Where does my project stand?"** — or run `/agent-lens:report`. Your agent
+  scans, writes the plain-English names itself (no copy-pasting a prompt), and
+  answers from the measurements rather than from memory.
+- **It keeps the plan honest.** As it finishes or gets stuck on planned work,
+  your agent ticks the checklist, marks blocked steps, and never marks a step
+  done until it works end to end. It asks before creating a plan file.
+
+Installing the plugin is your go-ahead for your agent to update the plan file.
+It still never edits `CLAUDE.md` or `AGENTS.md`.
+
 ## Commands
 
 ```bash
@@ -79,6 +115,8 @@ npx agent-lens-report render           # re-render without rescanning
 npx agent-lens-report author --prompt  # get better names and descriptions
 npx agent-lens-report plan-tip         # lines that make your agent keep the plan up to date
 ```
+
+The report opens in your browser after a scan. Add `--no-open` to skip that.
 
 ## Making it readable: the authoring pass
 
@@ -179,15 +217,17 @@ Everything on the page is measured or read from a file you control:
 
 - **Modules** are folders. Big folders split one level deeper until the map has
   enough detail to be worth looking at.
-- **Edges** are real resolved imports, including the TypeScript convention of
-  writing `./x.js` for `x.ts`.
+- **Edges** are real resolved imports: relative paths (including the TypeScript
+  convention of writing `./x.js` for `x.ts`), `@/...` shortcuts and `baseUrl`
+  from the nearest `tsconfig.json` or `jsconfig.json`, and workspace packages
+  imported by name in a monorepo.
 - **Tested** means a test file actually imports that module — not a filename
   guess.
 - **Rewrite hotspots** are relative to this repo (85th percentile of commit
   counts), so a mature codebase doesn't light up entirely amber.
 - **Plan status** comes from your plan file. If an agent hasn't ticked a box,
   it stays "not started" here even if the code exists. The report says which
-  file it read.
+  file it read, and tells you when that file changed since your last scan.
 - **Cost attribution is a heuristic.** Tokens are spent per message, not per
   file. The split is by which files a session touched. No pricing is applied,
   because rates vary by model and plan.
@@ -204,13 +244,16 @@ report without running anything. `report.html` is regenerated, so gitignore it.
 
 - **~90 modules is the readable ceiling.** Labels hide below 0.62 zoom; past
   that you want district collapsing, which isn't built yet.
-- **Import parsing is regex-based**, so dynamic imports and aliased paths
-  (`@/lib/...`) are missed. Tree-sitter would fix this.
+- **Import parsing is regex-based**, so dynamic imports (`import()` with a
+  computed path) are missed. Webpack or Vite aliases that are not also in
+  `tsconfig.json`/`jsconfig.json` are missed too.
 - **Codex's on-disk layout has been changing across versions.** The adapter
   degrades loudly rather than reporting a wrong number, but check it against
   your install.
 - **Flows only exist after an authoring pass.** Static analysis gives you the
   graph, not the journeys.
+- **"Going in circles" reads Claude Code logs for edits and errors.** For Codex
+  and Antigravity it can only use git history and the plan.
 
 ## Requirements
 

@@ -47,11 +47,30 @@ Options
   -o, --out <file>   report path (default: .agent-lens/report.html)
       --plan <file>  use this file as the plan instead of guessing
       --json         print the state to stdout instead of a report
-      --no-open      don't print the open hint
+      --no-open      don't open the report in your browser afterwards
 
 Everything runs locally. No code, prompt, or path is uploaded.`;
 
 const dir = (p) => { fs.mkdirSync(p, { recursive: true }); return p; };
+
+/**
+ * Open the report in the default browser — only for a person at a terminal.
+ * Never in CI, never when another program runs us (no TTY), never with
+ * --no-open or AGENT_LENS_NO_OPEN=1.
+ */
+function openReport(file, a) {
+  if (a.noOpen || process.env.AGENT_LENS_NO_OPEN || process.env.CI || !process.stdout.isTTY) return false;
+  const { spawn } = require('child_process');
+  const [cmd, args] = process.platform === 'darwin' ? ['open', [file]]
+    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', file]]
+      : ['xdg-open', [file]];
+  try {
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    child.on('error', () => {}); // no browser available: the path is printed anyway
+    child.unref();
+    return true;
+  } catch { return false; }
+}
 
 function loadAuthored(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
@@ -124,15 +143,17 @@ async function cmdScan(a) {
   if (state.meta.planFile) console.log(`  plan:   ${state.meta.planFile}`);
   if (state.meta.agentsDetected.length) console.log(`  agents: ${state.meta.agentsDetected.join(', ')}`);
   warnings.forEach((w) => console.log(`  note:   ${w}`));
+  for (const c of state.circles || []) console.log(`  watch:  ${c.title}. Ask your agent: "${c.ask}"`);
   const tip = state.meta.planTip;
-  if (tip && !a.noOpen) {
+  if (tip) {
     const why = { guessed: 'Plan statuses above are guesses.', guide: `Progress is measured against ${tip.guideFile}, a setup guide.`, missing: 'There is no plan checklist yet.' }[tip.reason];
     console.log(`  tip:    ${why} Ask your agent to keep a build plan:`);
     console.log(`          npx agent-lens-report plan-tip   (shows lines for ${describeTargets(tip)}; changes nothing)`);
   }
   console.log(`\n  report  ${reportFile}  (${Math.round(bytes / 1024)} KB)`);
   console.log(`  state   ${stateFile}`);
-  if (state.meta.needsAuthoring && !a.noOpen) {
+  if (openReport(reportFile, a)) console.log('  opened in your browser');
+  if (state.meta.needsAuthoring) {
     console.log(`\n  Folder names are placeholders. For plain-English descriptions, run this\n  inside your coding agent:  npx agent-lens-report author --prompt`);
   }
   console.log('');

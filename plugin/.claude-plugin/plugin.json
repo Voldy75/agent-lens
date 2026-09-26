@@ -1,0 +1,20 @@
+{
+  "name": "agent-lens",
+  "displayName": "agent-lens",
+  "version": "0.3.0",
+  "description": "See where an agent-built project actually stands: measured progress from your plan and git history, what is blocked, and whether your agent is going in circles. Runs the agent-lens-report package locally; nothing is uploaded.",
+  "author": {
+    "name": "Voldy75",
+    "url": "https://github.com/Voldy75"
+  },
+  "homepage": "https://github.com/Voldy75/agent-lens-report#readme",
+  "repository": "https://github.com/Voldy75/agent-lens-report",
+  "license": "MIT",
+  "keywords": [
+    "project-status",
+    "progress",
+    "plan",
+    "vibe-coding",
+    "non-technical"
+  ]
+}

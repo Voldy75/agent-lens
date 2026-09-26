@@ -1,6 +1,6 @@
 {
   "name": "agent-lens-report",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "See where an agent-built project actually stands. Reads git, plan files, and local coding-agent session logs, and writes one self-contained HTML report.",
   "bin": {
     "agent-lens": "bin/agent-lens.js",
@@ -13,7 +13,8 @@
     "lib/",
     "test/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=18"
@@ -24,7 +25,8 @@
     "test": "node test/selftest.js",
     "prepublishOnly": "node test/selftest.js",
     "rename": "node scripts/rename.js",
-    "set-repo": "node scripts/set-repo.js"
+    "set-repo": "node scripts/set-repo.js",
+    "version": "node scripts/sync-version.js && git add plugin/.claude-plugin/plugin.json"
   },
   "keywords": [
     "claude-code",

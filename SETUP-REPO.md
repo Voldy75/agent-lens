@@ -58,14 +58,8 @@ directory.
 
 ## Releasing later
 
-```bash
-npm version patch     # or minor / major — commits and tags
-git push --follow-tags
-npm publish
-```
-
-Versions are immutable and unpublishing is only free within 72 hours. Treat
-each publish as permanent.
+See `PUBLISHING.md`: pushing a version tag publishes to npm and creates the
+GitHub release automatically.
 
 ## Worth doing before you tell anyone
 

@@ -29,7 +29,7 @@ commit(28, 'Recipe search and pantry tracking');
 w('src/planner/week.tsx', imp('../recipes/search', '../pantry/stock') + body(120, 'v'));
 w('src/shopping/list.ts', imp('../planner/week', '../pantry/stock') + body(90, 'v'));
 commit(20, 'Weekly meal planner and shopping list');
-for (let i = 0; i < 6; i++) { w('src/planner/week.tsx', imp('../recipes/search', '../pantry/stock') + body(127 + i * 7, 'v')); commit(18 - i * 2, ['Fix planner week start', 'Planner: handle empty days', 'Planner layout on phones', 'Rework planner drag and drop', 'Planner: undo', 'Planner performance'][i]); }
+for (let i = 0; i < 6; i++) { w('src/planner/week.tsx', imp('../recipes/search', '../pantry/stock') + body(127 + i * 7, 'v')); commit(13 - i * 2, ['Fix planner week start', 'Planner: handle empty days', 'Planner layout on phones', 'Rework planner drag and drop', 'Planner: undo', 'Planner performance'][i]); }
 w('src/checkout/pay.ts', imp('../shopping/list') + body(50, 'v'));
 w('tests/recipes.test.ts', imp('../src/recipes/search'));
 w('tests/pantry.test.ts', imp('../src/pantry/stock'));
@@ -65,4 +65,13 @@ for (let d = 40; d >= 1; d -= 3) for (let k = 0; k < 6 + (d % 5); k++) {
 }
 fs.mkdirSync(path.join(HOME, '.claude', 'projects', slug), { recursive: true });
 fs.writeFileSync(path.join(HOME, '.claude', 'projects', slug, 'session.jsonl'), lines.join('\n') + '\n');
+
+// Two later sessions where the same type error keeps coming back from the build.
+const failing = (sid, d, n) => [
+  JSON.stringify({ type: 'assistant', timestamp: new Date(Date.now() - d * 864e5).toISOString(), message: { id: `f_${sid}_${n}`, content: [{ type: 'tool_use', id: `tf_${sid}_${n}`, name: 'Bash', input: { command: 'npm run build' } }] } }),
+  JSON.stringify({ type: 'user', timestamp: new Date(Date.now() - d * 864e5).toISOString(), message: { content: [{ type: 'tool_result', tool_use_id: `tf_${sid}_${n}`, is_error: true,
+    content: `Exit code 1\nsrc/planner/week.tsx(${40 + n},9): error TS2322: Type 'DayPlan | undefined' is not assignable to type 'DayPlan'.` }] } })
+].join('\n');
+fs.writeFileSync(path.join(HOME, '.claude', 'projects', slug, 'session-2.jsonl'), [failing('a', 6, 1), failing('a', 6, 2)].join('\n') + '\n');
+fs.writeFileSync(path.join(HOME, '.claude', 'projects', slug, 'session-3.jsonl'), [failing('b', 3, 3), failing('b', 3, 4)].join('\n') + '\n');
 console.log(OUT);

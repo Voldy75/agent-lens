@@ -1,0 +1,70 @@
+name: publish
+
+# Pushing a version tag (for example v0.3.0) publishes that version to npm and
+# creates a GitHub release with its CHANGELOG entry.
+#
+# Authentication uses npm trusted publishing: npm trusts this workflow in this
+# repository, so no npm token is stored anywhere. One-time setup on npmjs.com:
+# package "agent-lens-report" -> Settings -> Trusted publishing -> GitHub Actions,
+# repository Voldy75/agent-lens-report, workflow file publish.yml.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # create the GitHub release
+  id-token: write   # prove to npm that this workflow is the publisher
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Trusted publishing needs npm 11.5 or later, which ships with Node 24.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Tag matches package.json and the plugin manifest
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          PLUGIN=$(node -p "require('./plugin/.claude-plugin/plugin.json').version")
+          echo "tag $TAG, package.json $PKG, plugin.json $PLUGIN"
+          if [ "$TAG" != "$PKG" ] || [ "$TAG" != "$PLUGIN" ]; then
+            echo "::error::Tag v$TAG does not match package.json ($PKG) and plugin.json ($PLUGIN). Use 'npm version', which keeps all three in step."
+            exit 1
+          fi
+
+      - name: Selftest
+        run: node test/selftest.js
+
+      - name: Publish to npm
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "agent-lens-report@$VERSION" version >/dev/null 2>&1; then
+            echo "agent-lens-report@$VERSION is already on npm; nothing to publish."
+          else
+            npm publish --access public
+          fi
+
+      - name: GitHub release with the changelog entry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # The section between "## <version>" and the next "## " heading.
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[?" v "\\]?( |$)" { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "See CHANGELOG.md." > notes.md; fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists."
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          fi

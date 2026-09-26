@@ -1,0 +1,15 @@
+{
+  "name": "agent-lens",
+  "description": "See where an agent-built project actually stands, without reading the code.",
+  "owner": {
+    "name": "Voldy75",
+    "url": "https://github.com/Voldy75"
+  },
+  "plugins": [
+    {
+      "name": "agent-lens",
+      "source": "./plugin",
+      "description": "Ask where your project stands and get measured answers, have your agent keep the plan checklist honest, and hear when it is going in circles."
+    }
+  ]
+}

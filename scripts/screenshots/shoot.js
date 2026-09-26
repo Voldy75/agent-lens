@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await send('Page.navigate', { url: 'file://' + path.resolve(report) });
   await sleep(1500);
   const shots = [
-    ['now', 'now', null, 900],
+    ['now', 'now', null, 1180],
     ['plan', 'plan', null, 900],
     ['map', 'map', `document.querySelector('[data-flow]').click()`, 820],
     ['health', 'health', null, 760],
@@ -33,7 +33,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await js(`document.querySelector('.tab[data-p="${tab}"]').click(); window.scrollTo(0,0)`);
     if (extra) { await sleep(300); await js(extra); }
     await sleep(700);
-    const shot = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 1280, height: h, scale: 1 } });
+    const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width: 1280, height: h, scale: 1 } });
     fs.writeFileSync(path.join(outDir, `report-${name}.png`), Buffer.from(shot.result.data, 'base64'));
     console.log('saved', name);
   }

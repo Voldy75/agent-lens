@@ -1,16 +1,19 @@
-# README screenshots
+# README screenshots and the live demo
 
-The images in `docs/screenshots/` come from a fictional project, so no real
-project's commits or file names end up in the README. To regenerate them after
-a change to the report:
+`docs/screenshots/*.png` (the README images) and `docs/demo/index.html` (the
+clickable demo on GitHub Pages) come from a fictional project, "Pantry Pal",
+so no real project's commits or file names are published.
+
+Regenerate both after a change to the report:
 
 ```bash
-OUT=$(mktemp -d)
-node scripts/screenshots/build-demo.js "$OUT"
-cd "$OUT/pantry-pal" && HOME="$OUT/home" node "$OLDPWD/bin/agent-lens.js" --no-open
-HOME="$OUT/home" node "$OLDPWD/bin/agent-lens.js" author --apply "$OLDPWD/scripts/screenshots/authored.json"
-cd "$OLDPWD" && node scripts/screenshots/shoot.js "$OUT/pantry-pal/.agent-lens/report.html" docs/screenshots
+node scripts/screenshots/regenerate.js             # needs Google Chrome
+node scripts/screenshots/regenerate.js --no-shots  # demo page only
 ```
 
-`HOME` points at the demo's fake home folder so the sample session log is
-used instead of your own.
+The demo gets its own fake home folder, so its sample session logs are read
+instead of yours and it never appears in your `ls` list.
+
+- `build-demo.js` — the demo project: git history, a plan, sample agent logs
+- `authored.json` — its plain-English names and user journeys
+- `shoot.js` — screenshots each tab with headless Chrome

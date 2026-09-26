@@ -172,7 +172,12 @@ function main() {
   fs.writeFileSync(path.join(disc, 'SETUP.md'), '# Setup\n\nUse `api_key=sk-live-zzz` here.\n');
   run(['scan'], disc);
   const prompt = run(['author', '--prompt'], disc);
-  ok('credential-looking docs are skipped', !prompt.includes('sk-live-zzz'));
+  ok('credentials never reach the prompt', !prompt.includes('sk-live-zzz') && /\[redacted\]/.test(prompt));
+  // Docs that merely talk about tokens and keys are kept, not skipped.
+  write(path.join(disc, 'DESIGN.md'), '# Design\n\nColours come from design tokens. Put your API key in .env as API_KEY=<your key>.\n');
+  run(['scan'], disc);
+  const prompt2 = run(['author', '--prompt'], disc);
+  ok('docs that mention tokens are not skipped', /Colours come from design tokens/.test(prompt2) && !/skipped — looks like/.test(prompt2));
 
   // --- degradation --------------------------------------------------------
   const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-bare-'));
@@ -307,6 +312,110 @@ function fixes() {
   run(['--json'], jsonDir);
   ok('--json leaves nothing behind', !fs.existsSync(path.join(jsonDir, '.agent-lens')));
 
+  // --- imports through shortcuts, baseUrl and workspace packages ---------
+  const mono = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  write(path.join(mono, 'apps/web/tsconfig.json'), '{\n  // Next.js style, with a comment and a trailing comma\n  "compilerOptions": { "paths": { "@/*": ["./src/*"], }, },\n}\n');
+  write(path.join(mono, 'apps/web/src/lib/cart.ts'), body(20));
+  write(path.join(mono, 'apps/web/src/checkout/page.tsx'), "import { v0 } from '@/lib/cart';\nimport { v1 } from '@acme/shared';\n" + body(20));
+  write(path.join(mono, 'apps/admin/jsconfig.json'), '{ "compilerOptions": { "baseUrl": "src" } }');
+  write(path.join(mono, 'apps/admin/src/users/list.js'), "import { v0 } from 'reports/chart';\n" + body(20));
+  write(path.join(mono, 'apps/admin/src/reports/chart.js'), body(20));
+  write(path.join(mono, 'packages/shared/package.json'), JSON.stringify({ name: '@acme/shared', main: 'src/index.ts' }));
+  write(path.join(mono, 'packages/shared/src/index.ts'), body(20));
+  run(['scan'], mono);
+  const ms = stateOf(mono);
+  const modOf = (file) => (ms.modules.find((m) => (m.sources || []).some((s) => s === file || file.startsWith(s))) || {}).id;
+  const hasEdge = (a, b) => ms.edges.some(([x, y]) => x === modOf(a) && y === modOf(b));
+  // Small apps are one module each, so check these two at the file level.
+  const { collectFiles, resolveImport } = require(path.join(__dirname, '..', 'lib', 'collect', 'files'));
+  const mf = collectFiles(mono), mset = new Set(mf.map((f) => f.path));
+  ok('follows "@/" shortcuts from the nearest tsconfig', resolveImport('apps/web/src/checkout/page.tsx', '@/lib/cart', mset, mf.resolver) === 'apps/web/src/lib/cart.ts');
+  ok('follows baseUrl imports from jsconfig', resolveImport('apps/admin/src/users/list.js', 'reports/chart', mset, mf.resolver) === 'apps/admin/src/reports/chart.js');
+  ok('a shortcut from one app does not leak into another', resolveImport('apps/admin/src/users/list.js', '@/lib/cart', mset, mf.resolver) === null);
+  ok('follows workspace package imports', hasEdge('apps/web/src/checkout/page.tsx', 'packages/shared/src/index.ts'), JSON.stringify(ms.modules.map((m) => [m.id, m.sources])));
+
+  // A project with no tests at all says so once instead of "100% untested".
+  const nt = stateOf(mono).health;
+  ok('no-test projects say "no tests" instead of "100% untested"', nt.stats.some((x) => x.label === 'Automated tests' && x.value === 'None') && !nt.stats.some((x) => x.label === 'Untested modules'), JSON.stringify(nt.stats));
+  const withTests = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  write(path.join(withTests, 'src/a/x.ts'), body(5));
+  write(path.join(withTests, 'src/b/y.ts'), body(5));
+  write(path.join(withTests, 'tests/x.test.ts'), "import { v0 } from '../src/a/x';\n");
+  run(['scan'], withTests);
+  ok('projects with tests still show untested modules', stateOf(withTests).health.stats.some((x) => x.label === 'Untested modules'));
+
+  // Which file counts as the plan changed between scans: say so.
+  const flip = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  write(path.join(flip, 'src/a/x.ts'), body(5));
+  write(path.join(flip, 'PLAN.md'), '# Plan\n\n- [x] One\n- [ ] Two\n- [ ] Three\n');
+  run(['scan'], flip);
+  ok('no change note on a first scan', !stateOf(flip).meta.planChanged);
+  fs.renameSync(path.join(flip, 'PLAN.md'), path.join(flip, 'ROADMAP.md'));
+  const flipOut = run(['scan'], flip);
+  const fs2 = stateOf(flip);
+  ok('says when the plan file changed between scans', fs2.meta.planChanged && fs2.meta.planChanged.from === 'PLAN.md' && fs2.meta.planChanged.to === 'ROADMAP.md' && /not comparable/.test(fs2.summary.subhead) && /--plan PLAN\.md/.test(flipOut), fs2.summary.subhead);
+  run(['scan'], flip);
+  ok('the note goes away once it is stable', !stateOf(flip).meta.planChanged);
+  ok('nothing opens without a terminal', !/opened in your browser/.test(flipOut));
+
+  // --- going in circles --------------------------------------------------
+  const loop = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  const commitAt = (cwd, daysAgo, msg) => {
+    const when = new Date(Date.now() - daysAgo * 864e5).toISOString();
+    const env = { ...process.env, GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when };
+    try {
+      execFileSync('git', ['add', '-A'], { cwd, stdio: 'ignore' });
+      execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', msg], { cwd, stdio: 'ignore', env });
+    } catch { /* git unavailable */ }
+  };
+  try { execFileSync('git', ['init', '-q'], { cwd: loop, stdio: 'ignore' }); } catch { /* no git */ }
+  write(path.join(loop, 'PLAN.md'), '# Plan\n\n- [x] Catalog\n- [~] Checkout\n- [ ] Payments\n');
+  write(path.join(loop, 'src/catalog/list.ts'), body(10));
+  write(path.join(loop, 'src/checkout/pay.ts'), body(10));
+  commitAt(loop, 20, 'plan and scaffold');
+  for (let i = 0; i < 6; i++) { write(path.join(loop, 'src/checkout/pay.ts'), body(11 + i)); commitAt(loop, 10 - i, 'fix checkout ' + i); }
+  for (let i = 0; i < 6; i++) { write(path.join(loop, `src/catalog/n${i}.ts`), body(3)); commitAt(loop, 9 - i, 'catalog ' + i); }
+  const old = new Date(Date.now() - 20 * 864e5);
+  fs.utimesSync(path.join(loop, 'PLAN.md'), old, old); // the plan really was last touched 20 days ago
+
+  const loopSlug = fs.realpathSync(loop).replace(/[^a-zA-Z0-9]/g, '-');
+  const ts = (d) => new Date(Date.now() - d * 864e5).toISOString();
+  const call = (id, name, input) => JSON.stringify({ type: 'assistant', timestamp: ts(2), message: { id: 'm' + id, content: [{ type: 'tool_use', id: 't' + id, name, input }] } });
+  const result = (id, text, d) => JSON.stringify({ type: 'user', timestamp: ts(d), message: { content: [{ type: 'tool_result', tool_use_id: 't' + id, is_error: true, content: text }] } });
+  const tsErr = (n) => `Exit code 2\nsrc/checkout/pay.ts(${n},3): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.`;
+  write(path.join(HOME, '.claude', 'projects', loopSlug, 'a.jsonl'), [
+    call(1, 'Bash', { command: 'npx tsc' }), result(1, tsErr(4), 3),
+    call(2, 'Bash', { command: 'npx tsc' }), result(2, tsErr(9), 3),
+    call(3, 'Bash', { command: 'rm -rf x' }), result(3, "The user doesn't want to proceed with this tool use.", 3),
+    call(4, 'mcp__browser__click', {}), result(4, 'Error: click timed out', 3)
+  ].join('\n') + '\n');
+  write(path.join(HOME, '.claude', 'projects', loopSlug, 'b.jsonl'), [
+    call(5, 'Bash', { command: 'npx tsc' }), result(5, tsErr(12), 1),
+    call(6, 'Bash', { command: 'rm -rf x' }), result(6, "The user doesn't want to proceed with this tool use.", 1),
+    call(7, 'Bash', { command: 'rm -rf y' }), result(7, "The user doesn't want to proceed with this tool use.", 1),
+    call(8, 'mcp__browser__click', {}), result(8, 'Error: click timed out', 1),
+    call(9, 'mcp__browser__click', {}), result(9, 'Error: click timed out', 1)
+  ].join('\n') + '\n');
+
+  const loopOut = run(['scan'], loop);
+  const lc = stateOf(loop).circles || [];
+  const kinds = lc.map((c) => c.kind);
+  ok('spots a file that keeps being reworked', lc.some((c) => c.kind === 'rework' && /src\/checkout\/pay\.ts/.test(c.detail) && /6 commits/.test(c.detail)), JSON.stringify(lc.map((c) => c.detail)));
+  ok('spots the same error coming back across sessions', lc.some((c) => c.kind === 'failure' && /TS2345/.test(c.detail) && /3 times across 2 agent sessions/.test(c.detail)), JSON.stringify(lc.map((c) => c.detail)));
+  ok('declined tool calls and tool hiccups are not errors', lc.filter((c) => c.kind === 'failure').length === 1 && !lc.some((c) => /want to proceed|timed out/.test(c.detail)));
+  ok('spots work continuing while the plan stands still', lc.some((c) => c.kind === 'stalled' && /PLAN\.md/.test(c.detail) && /20 days/.test(c.detail)), JSON.stringify(kinds));
+  ok('each signal says what to ask the agent', lc.length >= 3 && lc.every((c) => c.ask && c.ask.length > 20));
+  ok('scan prints the signals', /watch:\s+.*keeps being reworked/.test(loopOut) && /Ask your agent:/.test(loopOut));
+  const loopMod = lc.find((c) => c.kind === 'rework').moduleId;
+  write(path.join(loop, 'authored.json'), JSON.stringify({ modules: [{ id: loopMod, name: 'Checkout', description: 'Paying.' }] }));
+  run(['author', '--apply', path.join(loop, 'authored.json')], loop);
+  ok('signals use authored names', (stateOf(loop).circles || []).some((c) => c.title === 'Checkout keeps being reworked'), JSON.stringify(stateOf(loop).circles.map((c) => c.title)));
+  // Ticking the plan clears the stall.
+  write(path.join(loop, 'PLAN.md'), '# Plan\n\n- [x] Catalog\n- [x] Checkout\n- [ ] Payments\n');
+  run(['scan'], loop);
+  ok('updating the plan clears the stall signal', !(stateOf(loop).circles || []).some((c) => c.kind === 'stalled'));
+  ok('a quiet project raises nothing', (stateOf(wrap).circles || []).length === 0);
+
   // --- plan tip: suggest lines for CLAUDE.md, never write them -------------
   const tipProj = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
   write(path.join(tipProj, 'src/a/x.ts'), body(5));
@@ -356,6 +465,13 @@ function fixes() {
   run(['scan'], bareTip);
   const bt = stateOf(bareTip).meta.planTip;
   ok('with no plan, suggests a new PLAN.md for either agent file', !!bt && bt.reason === 'missing' && bt.planFile === 'PLAN.md' && bt.targets.map((t) => t.file).join() === 'CLAUDE.md,AGENTS.md', JSON.stringify(bt));
+
+  // --- release plumbing ---------------------------------------------------
+  const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const pluginJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'plugin', '.claude-plugin', 'plugin.json'), 'utf8'));
+  ok('plugin version matches the package', pluginJson.version === pkgJson.version, `${pluginJson.version} vs ${pkgJson.version}`);
+  const changelog = fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
+  ok('CHANGELOG has an entry for this version', new RegExp(`^## \\[?${pkgJson.version.replace(/\./g, '\\.')}\\]?( |$)`, 'm').test(changelog));
 
   // --- the map: clicking a building must reach the building ---------------
   const tpl = fs.readFileSync(path.join(__dirname, '..', 'lib', 'template.html'), 'utf8');

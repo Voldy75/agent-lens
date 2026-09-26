@@ -1,91 +1,75 @@
-# Publishing this to npm
+# Releasing
 
-Right now the tarball installs locally. To make it globally installable —
-`npx <name>` from anywhere, for anyone — it has to be published to the public
-npm registry.
+Releases publish themselves: pushing a version tag runs
+`.github/workflows/publish.yml`, which checks the versions match, runs the
+selftest, publishes to npm and creates a GitHub release from `CHANGELOG.md`.
 
-## The name
+## One-time setup: npm trusted publishing
 
-`agent-lens` was free on npm when this was packaged. Names go daily, so check
-once more immediately before you publish:
+npm needs to know it can trust that workflow. No token is stored anywhere.
+
+1. Sign in at npmjs.com and open the `agent-lens-report` package.
+2. **Settings → Trusted publishing → GitHub Actions**.
+3. Repository `Voldy75/agent-lens-report`, workflow file `publish.yml`.
+   Leave the environment empty.
+4. Save.
+
+Optionally, under **Settings → Publishing access**, choose "Require two-factor
+authentication and disallow tokens" once a release has gone through, so the
+workflow is the only way to publish.
+
+## Each release
+
+1. Add a section to the top of `CHANGELOG.md`:
+
+   ```markdown
+   ## 0.3.1 — 2026-10-02
+
+   - What changed, in words a user understands.
+   ```
+
+   The selftest fails if the version has no entry, and the section becomes the
+   GitHub release notes.
+
+2. Commit the changelog, then bump the version and push with its tag:
+
+   ```bash
+   npm version patch     # or minor / major
+   git push --follow-tags
+   ```
+
+   `npm version` also updates the Claude Code plugin's version
+   (`scripts/sync-version.js`), so the tag, the npm package and the plugin
+   always match. The workflow refuses to publish if they don't.
+
+3. Watch the **publish** workflow on GitHub. npm can take a few minutes to show
+   the new version after it succeeds.
+
+If the README screenshots or the live demo should change too, regenerate them
+before step 2:
 
 ```bash
-npm view agent-lens version     # a 404 means it's still yours to take
+node scripts/screenshots/regenerate.js
 ```
 
-If it has gone, scope it instead — a scoped name is yours the moment you have
-an account:
+## Publishing by hand
+
+If the workflow can't be used, publish from your machine as before:
 
 ```bash
-npm run rename -- @<your-npm-username>/agent-lens
+npm login
+npm publish
 ```
 
-Note that `agentlens` (no hyphen) is taken by an unrelated package at 1.0.0.
-That is worth knowing for two reasons: people will typo it, and it rules out
-grabbing the unhyphenated form later.
+`prepublishOnly` runs the selftest first, so a broken build can't ship. If your
+account asks for a one-time code, add `--otp=123456`.
 
-## Then: publish
+## Worth knowing
 
-```bash
-npm adduser                  # or: npm login
-npm whoami                   # confirm you're logged in
-npm publish --access public  # --access public only needed for scoped names
-```
-
-`prepublishOnly` runs the selftest first, so a broken build can't ship.
-
-If your account has 2FA on (it should), npm will prompt for a one-time code, or
-pass `--otp=123456`.
-
-## Things worth knowing before you hit publish
-
-**Versions are immutable.** You cannot republish `0.1.0` with different
-contents. Every change needs `npm version patch|minor|major`.
-
-**Unpublishing is limited.** You have 72 hours to remove a version freely.
-After that, npm only allows it if nothing depends on your package. Assume what
-you publish is permanent.
-
-**Everything in `files` becomes public.** Check the list before publishing:
-
-```bash
-npm pack --dry-run
-```
-
-Confirm there's no `.agent-lens/` from your own testing, no state file with
-your paths in it, no `.env`.
-
-**Publish a scoped name once as a test.** Publish `0.1.0`, install it on a
-different machine, run `agent-lens-selftest`, and only then tell anyone about
-it.
-
-## A GitHub repo first
-
-Before publishing, put the source on GitHub and add the URLs to
-`package.json` — npm shows them on the package page and people will not
-install a CLI that reads their session logs without being able to read the
-source:
-
-```json
-"repository": { "type": "git", "url": "git+https://github.com/<you>/agent-lens.git" },
-"homepage": "https://github.com/<you>/agent-lens#readme",
-"bugs": { "url": "https://github.com/<you>/agent-lens/issues" }
-```
-
-You can also publish straight from CI with npm provenance, which attaches a
-verifiable link between the tarball and the commit it was built from. Worth
-doing for a tool that asks for this much trust, but not on day one.
-
-## Before you publish at all
-
-This reads people's local agent session logs. That is a lot of trust to ask
-for from a version `0.1.0` published by an unknown account. Two things to do
-first:
-
-1. Run it on five or six real repos of your own, in different languages, and
-   check the clustering is not embarrassing.
-2. Make the privacy claim verifiable — the README says no network calls, and
-   the code should be easy enough to read that someone can confirm it in two
-   minutes. It currently is. Keep it that way.
-
-A tool like this gets exactly one first impression.
+- Versions are permanent. Unpublishing is only possible within 72 hours and
+  blocks that version number forever, so treat every publish as final.
+- `agentlens` (no hyphen) is an unrelated package. npm blocks names that differ
+  only by punctuation, which is why this package is `agent-lens-report`.
+- The Claude Code plugin is served from this repository, not from npm. Users
+  get plugin updates from the `master` branch; the plugin itself runs the
+  latest npm release.
