@@ -7,6 +7,8 @@ const path = require('path');
 const { buildState } = require('../lib/build/state');
 const { renderToFile } = require('../lib/render');
 const { authoringPrompt, applyAuthoring } = require('../lib/author');
+const { planTip, describeTargets } = require('../lib/plan-tip');
+const { collectPlans } = require('../lib/collect/plans');
 
 const VERSION = require('../package.json').version;
 const HOME_DIR = path.join(os.homedir(), '.agent-lens');
@@ -38,6 +40,7 @@ const HELP = `agent-lens ${VERSION} — see where an agent-built project actuall
   npx agent-lens-report author --apply f.json   merge an agent's authored fields
   npx agent-lens-report render          re-render from the existing state file
   npx agent-lens-report ls              every project you've scanned
+  npx agent-lens-report plan-tip        lines to add so your agent keeps the plan up to date
 
 Options
   -C, --cwd <dir>    project folder (default: here)
@@ -121,6 +124,12 @@ async function cmdScan(a) {
   if (state.meta.planFile) console.log(`  plan:   ${state.meta.planFile}`);
   if (state.meta.agentsDetected.length) console.log(`  agents: ${state.meta.agentsDetected.join(', ')}`);
   warnings.forEach((w) => console.log(`  note:   ${w}`));
+  const tip = state.meta.planTip;
+  if (tip && !a.noOpen) {
+    const why = { guessed: 'Plan statuses above are guesses.', guide: `Progress is measured against ${tip.guideFile}, a setup guide.`, missing: 'There is no plan checklist yet.' }[tip.reason];
+    console.log(`  tip:    ${why} Ask your agent to keep a build plan:`);
+    console.log(`          npx agent-lens-report plan-tip   (shows lines for ${describeTargets(tip)}; changes nothing)`);
+  }
   console.log(`\n  report  ${reportFile}  (${Math.round(bytes / 1024)} KB)`);
   console.log(`  state   ${stateFile}`);
   if (state.meta.needsAuthoring && !a.noOpen) {
@@ -163,6 +172,20 @@ function cmdAuthor(a) {
   process.stdout.write(authoringPrompt(state, root));
 }
 
+function cmdPlanTip(a) {
+  // Checked fresh rather than read from an old scan, and writes nothing.
+  const root = path.resolve(a.cwd);
+  const plans = collectPlans(root, { planFile: a.planFile });
+  const tip = planTip(root, plans, (plans.agents || []).map((x) => (x === 'claude' ? 'claude-code' : x)));
+  if (!tip) { console.log('\n  Nothing to add: the plan is already a checklist your agent can tick off.\n'); return; }
+  console.log(`\n  ${{ guessed: 'Plan statuses are guesses right now.', guide: `Progress is measured against ${tip.guideFile}, a setup guide, because no build plan was found.`, missing: 'This project has no plan checklist yet.' }[tip.reason]}`);
+  console.log(`  Add these lines to ${describeTargets(tip)} so your agent keeps ${tip.planFile} up to date.`);
+  console.log('  agent-lens will not edit that file for you.\n');
+  console.log(tip.text.split('\n').map((l) => '    ' + l).join('\n'));
+  console.log('\n  Next time your agent works on the project it will keep the checklist, and the');
+  console.log('  report will measure real progress against it.\n');
+}
+
 function cmdLs() {
   let idx = {};
   try { idx = JSON.parse(fs.readFileSync(INDEX, 'utf8')); } catch { console.log('Nothing scanned yet.'); return; }
@@ -191,6 +214,7 @@ async function main() {
     if (cmd === 'render') return cmdRender(a);
     if (cmd === 'author') return cmdAuthor(a);
     if (cmd === 'ls') return cmdLs();
+    if (cmd === 'plan-tip') return cmdPlanTip(a);
     console.log(HELP);
   } catch (e) {
     console.error(`agent-lens failed: ${e.message}`);

@@ -77,6 +77,7 @@ npx agent-lens-report -C ../other-app  # scan somewhere else
 npx agent-lens-report ls               # every project you've scanned, with % done
 npx agent-lens-report render           # re-render without rescanning
 npx agent-lens-report author --prompt  # get better names and descriptions
+npx agent-lens-report plan-tip         # lines that make your agent keep the plan up to date
 ```
 
 ## Making it readable: the authoring pass
@@ -154,6 +155,23 @@ things happen:
 
 The agent is told to prefer "active" over "done" when it can't tell. A wrong
 "done" is the worst error this tool can make.
+
+### Getting real progress: let your agent keep the checklist
+
+Guessed statuses are the weakest part of any report. The fix is for your agent
+to keep a real checklist as it works. When statuses are guessed, when there is
+no plan, or when progress is being counted from a setup guide, the report and
+the scan suggest a few lines to add to your agent's instruction file
+(`CLAUDE.md` for Claude Code, `AGENTS.md` for Codex, Cursor and others):
+
+```bash
+npx agent-lens-report plan-tip    # prints the lines; changes nothing
+```
+
+The Now tab shows the same lines with a Copy button. **agent-lens never edits
+those files for you.** They are yours, often shared with a team, and changing
+how someone's agent behaves is their call. Once the lines are in, the
+suggestion stops appearing.
 
 ## How it decides things
 

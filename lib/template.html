@@ -153,6 +153,11 @@ td.mono{font-family:var(--mono);font-size:12px}
 .foot{border-top:1px solid var(--rule);margin-top:40px;padding:16px 0 0;color:var(--ghost);font-size:11.5px;font-family:var(--mono)}
 .warnbox{border:1px solid rgba(169,112,8,.4);background:var(--amber-soft);padding:11px 14px;margin-bottom:24px;font-size:12.5px;color:var(--ink)}
 .warnbox ul{margin:6px 0 0;padding-left:18px;color:var(--graphite)}
+.tipbox{border:1px solid var(--rule);background:var(--sheet);padding:14px 16px;margin:0 0 30px;font-size:13px;color:var(--ink)}
+.tipbox p{margin:6px 0 10px;color:var(--graphite)}
+.tipbox pre{margin:0;padding:12px 14px;background:rgba(19,26,33,.05);font-family:var(--mono);font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.tipbox .row{display:flex;gap:12px;align-items:center;margin-top:10px;font-size:12px;color:var(--ghost)}
+.tipbox button{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
 
 @media (max-width:1000px){
   .grid2,.costgrid{grid-template-columns:1fr}
@@ -289,6 +294,19 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
     </div>`;
   }
 
+  const tip = STATE.planTip;
+  if (tip) {
+    const where = tip.targets.map(t => `<b>${esc(t.file)}</b>${t.exists ? "" : ` (${esc(t.label)})`}`).join(" or ");
+    const tipCopy = {
+      guessed: ["Get real progress instead of guesses", `The plan statuses above are guessed from wording. Add these lines to ${where} and your agent will keep ${esc(tip.planFile)} as a checklist it ticks off as it works.`],
+      guide: ["Measure progress against a build plan", `No build plan was found, so progress above is counted from ${esc(tip.guideFile || "a setup guide")}, a setup checklist. Add these lines to ${where} and your agent will write a build plan in ${esc(tip.planFile)} and tick it off as it works.`],
+      missing: ["Get a plan your agent keeps up to date", `There is no plan checklist to measure progress against. Add these lines to ${where} and your agent will write one in ${esc(tip.planFile)} and tick it off as it works.`]
+    }[tip.reason] || [];
+    html += `<div class="tipbox"><b>${tipCopy[0]}</b>
+      <p>${tipCopy[1]}</p>
+      <pre id="tiptext">${esc(tip.text)}</pre>
+      <div class="row"><button type="button" id="tipcopy">Copy</button><span>agent-lens never edits this file for you.</span></div></div>`;
+  }
   const cards = [];
   if ((STATE.blockers || []).length) {
     cards.push(`<div class="card"><h3>What's blocking you</h3>${STATE.blockers.map(b =>
@@ -309,6 +327,14 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
       <ul>${BUILD.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
   }
   $("p-now").innerHTML = html;
+  const copyBtn = $("tipcopy");
+  if (copyBtn) copyBtn.addEventListener("click", () => {
+    const text = $("tiptext").textContent;
+    const done = () => { copyBtn.textContent = "Copied"; setTimeout(() => { copyBtn.textContent = "Copy"; }, 1600); };
+    // file:// pages may not get the async clipboard API; fall back to a hidden textarea.
+    const fallback = () => { const t = document.createElement("textarea"); t.value = text; t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); done(); } catch (e) {} t.remove(); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  });
 })();
 
 /* ---------- plan ---------- */

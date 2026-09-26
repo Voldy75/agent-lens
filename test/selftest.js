@@ -307,6 +307,56 @@ function fixes() {
   run(['--json'], jsonDir);
   ok('--json leaves nothing behind', !fs.existsSync(path.join(jsonDir, '.agent-lens')));
 
+  // --- plan tip: suggest lines for CLAUDE.md, never write them -------------
+  const tipProj = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  write(path.join(tipProj, 'src/a/x.ts'), body(5));
+  write(path.join(tipProj, 'handoff.md'), '# Handoff\n\nNotes for whoever picks this up next, human or agent.\n\n## Plan\n- Search is done\n- Checkout in progress\n- Payments blocked on keys from the provider\n- Order emails\n\n## Status\nWorking on checkout this week.\n');
+  const claudeMd = '# My app\n\nUse TypeScript.\n';
+  write(path.join(tipProj, 'CLAUDE.md'), claudeMd);
+  gitInit(tipProj);
+  const before = fs.readdirSync(tipProj).sort().join(',');
+  const tipOut = run(['scan'], tipProj);
+  const tip = stateOf(tipProj).meta.planTip;
+  ok('suggests plan lines when statuses are guesses', !!tip && tip.reason === 'guessed' && tip.planFile === 'handoff.md', JSON.stringify(tip));
+  ok('suggestion names the instruction file the project has', !!tip && tip.targets.length === 1 && tip.targets[0].file === 'CLAUDE.md');
+  ok('scan points to the plan-tip command', /npx agent-lens-report plan-tip/.test(tipOut));
+  ok('CLAUDE.md is never modified', fs.readFileSync(path.join(tipProj, 'CLAUDE.md'), 'utf8') === claudeMd);
+  ok('no files are added outside .agent-lens', fs.readdirSync(tipProj).filter((f) => f !== '.agent-lens').sort().join(',') === before.split(',').filter((f) => f !== '.agent-lens').join(','));
+  const tipCmd = run(['plan-tip'], tipProj);
+  const freshDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  write(path.join(freshDir, 'src/a/x.ts'), body(5));
+  ok('plan-tip works without a scan and writes nothing', /Project plan \(read by agent-lens\)/.test(run(['plan-tip'], freshDir)) && !fs.existsSync(path.join(freshDir, '.agent-lens')));
+  ok('plan-tip prints the lines to add', /Project plan \(read by agent-lens\)/.test(tipCmd) && /handoff\.md/.test(tipCmd) && /will not edit/.test(tipCmd));
+  const tipHtml = fs.readFileSync(path.join(tipProj, '.agent-lens', 'report.html'), 'utf8');
+  const embedded = JSON.parse(tipHtml.match(/const STATE = (.*);\s*$/m)[1]);
+  ok('report embeds the suggestion for the page to show', embedded.planTip && embedded.planTip.reason === 'guessed', JSON.stringify(Object.keys(embedded)));
+  // Once the user has pasted the lines in, stop asking.
+  write(path.join(tipProj, 'CLAUDE.md'), claudeMd + '\n' + tip.text + '\n');
+  run(['scan'], tipProj);
+  ok('no suggestion once the lines are in CLAUDE.md', !stateOf(tipProj).meta.planTip);
+  // A real checklist needs no suggestion.
+  ok('no suggestion for a checkbox plan', !stateOf(wrap).meta.planTip);
+  // A setup guide that won only because nothing else qualified still gets the suggestion.
+  const guideProj = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  write(path.join(guideProj, 'src/a/x.ts'), body(5));
+  write(path.join(guideProj, 'MOBILE_SETUP.md'), '# Mobile setup\n\n## Steps\n' + Array.from({ length: 12 }, (_, i) => `- [${i < 3 ? 'x' : ' '}] Set up thing ${i}`).join('\n') + '\n\n## Remaining checklist\n- [ ] Submit to the store\n');
+  // Like a real one, it has been edited several times.
+  gitInit(guideProj);
+  for (let i = 0; i < 3; i++) {
+    fs.appendFileSync(path.join(guideProj, 'MOBILE_SETUP.md'), `\nNote ${i}.\n`);
+    try { execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'edit ' + i], { cwd: guideProj, stdio: 'ignore' }); } catch { /* git unavailable */ }
+  }
+  run(['scan'], guideProj);
+  const gt = stateOf(guideProj);
+  ok('suggests a build plan when progress comes from a setup guide', gt.meta.planFile === 'MOBILE_SETUP.md' && gt.meta.planTip && gt.meta.planTip.reason === 'guide' && gt.meta.planTip.planFile === 'PLAN.md', JSON.stringify(gt.meta.planTip));
+
+  // No plan and no instruction files: offer both, with a new PLAN.md.
+  const bareTip = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-lens-fix-'));
+  write(path.join(bareTip, 'src/a/x.ts'), body(5));
+  run(['scan'], bareTip);
+  const bt = stateOf(bareTip).meta.planTip;
+  ok('with no plan, suggests a new PLAN.md for either agent file', !!bt && bt.reason === 'missing' && bt.planFile === 'PLAN.md' && bt.targets.map((t) => t.file).join() === 'CLAUDE.md,AGENTS.md', JSON.stringify(bt));
+
   // --- the map: clicking a building must reach the building ---------------
   const tpl = fs.readFileSync(path.join(__dirname, '..', 'lib', 'template.html'), 'utf8');
   const down = (tpl.match(/addEventListener\("pointerdown",[^\n]*/) || [''])[0];
